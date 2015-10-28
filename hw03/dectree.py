@@ -13,8 +13,8 @@ def class_dist_to_list(class_dist, length=3):
 
 
 
-def calc_gini(points):
-    dist = class_dist_to_list(get_class_distribution(points))
+def calc_gini(points, length=3):
+    dist = class_dist_to_list(get_class_distribution(points), length=length)
     return gini(dist)  # by label
 
 
@@ -31,15 +31,16 @@ def select_most_frequent_label(points):
 
 
 class DecisionTreeNode(object):
-    def __init__(self, points, depth=0):
+    def __init__(self, points, depth=0, dimensions=3):
         # points should be formatted: [((x1, x2, x3, ...), label), ((x1, x2, x3, ...), label), ...]
         self.left_child = None
         self.right_child = None
         self.split_test = None
         self.contained_points = points
         self.label = select_most_frequent_label(self.contained_points)
-        self.cost = calc_gini(self.contained_points)
+        self.cost = calc_gini(self.contained_points, length=dimensions)
         self.depth = depth
+        self._dimensions = dimensions
 
     def classify(self, point, details=False):
         # point shoud just be a tuple of n values here, no label in position 1.
@@ -58,7 +59,7 @@ class DecisionTreeNode(object):
                 return self.right_child.classify(point, details=details)
 
     def build_children(self):
-        split_dimension, split_threshold, split_cost = find_best_split(self.contained_points)
+        split_dimension, split_threshold, split_cost = find_best_split(self.contained_points, length=self._dimensions)
         if split_cost < self.cost:  # is this split even worth making? TODO: include a minumum change threshold here
             group1, group2 = split_data(self.contained_points, split_dimension, split_threshold)
 
@@ -66,8 +67,8 @@ class DecisionTreeNode(object):
             self._split_dimension = split_dimension
             self._split_threshold = split_threshold
 
-            self.left_child = DecisionTreeNode(group1, depth=self.depth+1)
-            self.right_child = DecisionTreeNode(group2, depth=self.depth+1)
+            self.left_child = DecisionTreeNode(group1, depth=self.depth+1, dimensions=self._dimensions)
+            self.right_child = DecisionTreeNode(group2, depth=self.depth+1, dimensions=self._dimensions)
 
             return True  # we did a split
         else:
@@ -84,9 +85,9 @@ class DecisionTreeNode(object):
             ret += self.right_child.to_string(level+1)
         return ret
 
-def build_tree(data, max_depth):
+def build_tree(data, max_depth, dimensions=3):
     # do breadth first traversal to build the tree to it's maximum depth
-    root = DecisionTreeNode(data)
+    root = DecisionTreeNode(data, dimensions=3)
     nodes = [root]
     while nodes:
         node = nodes.pop(0)
@@ -100,7 +101,7 @@ def build_tree(data, max_depth):
     return root
 
 
-def find_best_split(data):
+def find_best_split(data, length=3):
     total_points = float(len(data))
 
     best_dimension = None
@@ -118,7 +119,7 @@ def find_best_split(data):
 
             weight_first = len(first_group) / total_points
             weight_second = len(second_group) / total_points
-            split_score = weight_first * calc_gini(first_group) + weight_second * calc_gini(second_group)
+            split_score = weight_first * calc_gini(first_group, length=length) + weight_second * calc_gini(second_group, length=length)
 
             if split_score <= best_split_cost:
                 best_split_cost = split_score
@@ -145,7 +146,7 @@ if __name__ == "__main__":
             x1, x2, x3, label = map(lambda elem: float(elem.strip()), line.split(","))
             data.append(((x1, x2, x3), int(label)))
 
-    classifier = build_tree(data, max_depth=2)
+    classifier = build_tree(data, max_depth=2, dimensions=3)
     print classifier.to_string()
 
     x_a = (4.1, -0.1, 2.2)
